@@ -1,11 +1,12 @@
-const fs = require("fs");
-
-const path = require("path");
-const puppeteer = require("puppeteer-extra");
-const StealthPlugin = require("puppeteer-extra-plugin-stealth");
+import fs from "fs";
+import path from "path";
+import puppeteer from "puppeteer-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import dotenv from "dotenv";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 
 puppeteer.use(StealthPlugin());
-const dotenv = require("dotenv");
 
 // Load the default .env file
 dotenv.config();
@@ -192,7 +193,10 @@ async function launchBrowserForUser(username, password) {
 
     //真正执行阅读脚本
     // 读取外部脚本文件的内容
-    const externalScriptPath = path.join(__dirname, "external.js");
+    const externalScriptPath = path.join(
+      dirname(fileURLToPath(import.meta.url)),
+      "external.js"
+    );
     const externalScript = fs.readFileSync(externalScriptPath, "utf8");
 
     // 在每个新的文档加载时执行外部脚本

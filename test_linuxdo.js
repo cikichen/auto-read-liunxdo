@@ -3,7 +3,7 @@ import { connect } from "puppeteer-real-browser";
 while (true) {
   console.log("Start of test.js");
   const { page, browser } = await connect({
-    headless: false,
+    headless: 'auto',
     args: [],
     customConfig: {},
     skipTarget: [],
@@ -17,6 +17,7 @@ while (true) {
       .catch((e) => console.log(e.message));
   }, 1000);
   console.log("Connected to browser");
+  // https://nopecha.com/demo/cloudflare  https://linux.do
   await page.goto("https://linux.do", {
     waitUntil: "domcontentloaded",
   });

@@ -1,11 +1,16 @@
-const fs = require("fs");
-
-const path = require("path");
-const puppeteer = require("puppeteer-extra");
-const StealthPlugin = require("puppeteer-extra-plugin-stealth");
-
+import fs from "fs";
+import path from "path";
+import puppeteer from "puppeteer-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import dotenv from "dotenv";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+// 截图保存的文件夹
+const screenshotDir = "screenshots";
+if (!fs.existsSync(screenshotDir)) {
+  fs.mkdirSync(screenshotDir);
+}
 puppeteer.use(StealthPlugin());
-const dotenv = require("dotenv");
 
 // Load the default .env file
 dotenv.config();
@@ -15,6 +20,10 @@ if (fs.existsSync(".env.local")) {
   for (const k in envConfig) {
     process.env[k] = envConfig[k];
   }
+} else {
+  console.log(
+    "Using .env file to supply config environment variables, you can create a .env.local file to overwrite defaults, it doesn't upload to git"
+  );
 }
 // 从环境变量解析用户名和密码
 const usernames = process.env.USERNAMES.split(",");
@@ -50,7 +59,7 @@ function delayClick(time) {
     });
 
     // 等待所有登录操作完成
-    await Promise.all(loginPromises);
+    // await Promise.all(loginPromises);
   } catch (error) {
     // 错误处理逻辑
     console.error("发生错误：", error);
@@ -59,27 +68,27 @@ function delayClick(time) {
 async function launchBrowserForUser(username, password) {
   try {
     const browserOptions = {
-      headless: "auto", 
+      headless: "auto",
       args: ["--no-sandbox", "--disable-setuid-sandbox"], // Linux 需要的安全设置
     };
 
     // 如果环境变量不是 'dev'，则添加代理配置
     // if (process.env.ENVIRONMENT !== "dev") {
-      // browserOptions["proxy"] = {
-      //   host: "38.154.227.167",
-      //   port: "5868",
-      //   username: "pqxujuyl",
-      //   password: "y1nmb5kjbz9t",
-      // };
+    // browserOptions["proxy"] = {
+    //   host: "38.154.227.167",
+    //   port: "5868",
+    //   username: "pqxujuyl",
+    //   password: "y1nmb5kjbz9t",
+    // };
     // }
 
     var { connect } = await import("puppeteer-real-browser");
-    const { page, browser } = await connect(
-        browserOptions
-    );
-    // await page.goto(loginUrl);
+    const { page, browser } = await connect(browserOptions);
+    // 设置导航超时时间为60秒
+    page.setDefaultNavigationTimeout(60000);
+    // 启动截图功能
+    // takeScreenshots(page);
     //登录操作
-    // await page.goto(loginUrl, { waitUntil: "networkidle0" });
     await navigatePage(loginUrl, page, browser);
     await delayClick(8000);
     // 设置额外的 headers
@@ -87,11 +96,11 @@ async function launchBrowserForUser(username, password) {
       "accept-language": "en-US,en;q=0.9",
     });
     // 验证 `navigator.webdriver` 属性是否为 undefined
-    const isWebDriverUndefined = await page.evaluate(() => {
-      return `${navigator.webdriver}`;
-    });
+    // const isWebDriverUndefined = await page.evaluate(() => {
+    //   return `${navigator.webdriver}`;
+    // });
 
-    console.log("navigator.webdriver is :", isWebDriverUndefined); // 输出应为 true
+    // console.log("navigator.webdriver is :", isWebDriverUndefined); // 输出应为 false
     page.on("pageerror", (error) => {
       console.error(`Page error: ${error.message}`);
     });
@@ -130,42 +139,21 @@ async function launchBrowserForUser(username, password) {
     });
     // //登录操作
     console.log("登录操作");
-    // 使用XPath查询找到包含"登录"或"login"文本的按钮
-    await page.evaluate(() => {
-      let loginButton = Array.from(document.querySelectorAll("button")).find(
-        (button) =>
-          button.textContent.includes("登录") ||
-          button.textContent.includes("login")
-      );
-      // 如果没有找到，尝试根据类名查找
-      if (!loginButton) {
-        loginButton = document.querySelector(
-          ".widget-button.btn.btn-primary.btn-small.login-button.btn-icon-text"
-        );
-      }
-      console.log(loginButton);
-      if (loginButton) {
-        loginButton.click();
-        console.log("Login button clicked.");
-      } else {
-        console.log("Login button not found.");
-      }
-    });
-
     await login(page, username, password);
     // 查找具有类名 "avatar" 的 img 元素验证登录是否成功
     const avatarImg = await page.$("img.avatar");
 
     if (avatarImg) {
       console.log("找到avatarImg，登录成功");
-      // 可以继续对 avatarImg 进行操作，比如获取其属性等
     } else {
       console.log("未找到avatarImg，登录失败");
     }
 
     //真正执行阅读脚本
-    // 读取外部脚本文件的内容
-    const externalScriptPath = path.join(__dirname, "external.js");
+    const externalScriptPath = path.join(
+      dirname(fileURLToPath(import.meta.url)),
+      "external.js"
+    );
     const externalScript = fs.readFileSync(externalScriptPath, "utf8");
 
     // 在每个新的文档加载时执行外部脚本
@@ -177,12 +165,37 @@ async function launchBrowserForUser(username, password) {
     page.on("load", async () => {
       // await page.evaluate(externalScript); //因为这个是在页面加载好之后执行的,而脚本是在页面加载好时刻来判断是否要执行，由于已经加载好了，脚本就不会起作用
     });
-    await page.goto("https://linux.do/t/topic/13716/285");
+    await page.goto("https://linux.do/t/topic/13716/285", {
+      waitUntil: "domcontentloaded",
+    });
   } catch (err) {
     console.log(err);
   }
 }
 async function login(page, username, password) {
+  // 使用XPath查询找到包含"登录"或"login"文本的按钮
+  let loginButton;
+  await page.evaluate(() => {
+    let loginButton = Array.from(document.querySelectorAll("button")).find(
+      (button) =>
+        button.textContent.includes("登录") ||
+        button.textContent.includes("login")
+    );
+    // 如果没有找到，尝试根据类名查找
+    if (!loginButton) {
+      loginButton = document.querySelector(".login-button");
+    }
+    if (loginButton) {
+      loginButton.click();
+      console.log("Login button clicked.");
+    } else {
+      console.log("Login button not found.");
+    }
+  });
+  if (!loginButton) {
+    await page.goto(`${loginUrl}/t/topic/1`, { waitUntil: "domcontentloaded" });
+    await page.click(".discourse-reactions-reaction-button");
+  }
   // 等待用户名输入框加载
   await page.waitForSelector("#login-account-name");
   // 模拟人类在找到输入框后的短暂停顿
@@ -210,26 +223,28 @@ async function login(page, username, password) {
   await delayClick(500); // 模拟在点击登录按钮前的短暂停顿
   try {
     await Promise.all([
-      //   page.waitForNavigation({ waitUntil: "domcontentloaded" }), // 等待 页面跳转 DOMContentLoaded 事件
+      page.waitForNavigation({ waitUntil: "domcontentloaded" }), // 等待 页面跳转 DOMContentLoaded 事件
+      // 去掉上面一行会报错：Error: Execution context was destroyed, most likely because of a navigation. 可能是因为之后没等页面加载完成就执行了脚本
       page.click("#login-button"), // 点击登录按钮触发跳转
-    ]); //注意如果登录失败，这里会一直等待跳转，导致脚本执行失败
+    ]); //注意如果登录失败，这里会一直等待跳转，导致脚本执行失败 这点四个月之前你就发现了结果今天又遇到（有个用户遇到了https://linux.do/t/topic/169209/82），但是你没有在这个报错你提示我8.5
   } catch (error) {
-    console.error("Navigation timed out in login.:", error);
+    console.error(
+      "Navigation timed out in login.请检查用户名密码是否正确(注意密码中是否有特殊字符,需要外面加上双引号指明这是字符串，如果密码里面有双引号则需要转义), 此外GitHub action不需要加上引号:",
+      error
+    );
     throw new Error("Navigation timed out in login.");
   }
   await delayClick(1000);
 }
 
 async function navigatePage(url, page, browser) {
-  await page.goto(url);
+  await page.goto(url, { waitUntil: "domcontentloaded" }); //如果使用默认的load,linux下页面会一直加载导致无法继续执行
 
   const startTime = Date.now(); // 记录开始时间
   let pageTitle = await page.title(); // 获取当前页面标题
 
   while (pageTitle.includes("Just a moment")) {
-    console.log(
-      "The page is under Cloudflare protection. Waiting..."
-    );
+    console.log("The page is under Cloudflare protection. Waiting...");
 
     await delayClick(2000); // 每次检查间隔2秒
 
@@ -242,8 +257,33 @@ async function navigatePage(url, page, browser) {
       await browser.close();
       return; // 超时则退出函数
     }
-  }
+  } 
+  console.log("页面标题：", pageTitle);
+}
 
-  // 如果循环正常结束，说明页面已经加载完毕，没有超时
-  console.log("The page is ready for further actions.");
+// 每秒截图功能
+async function takeScreenshots(page) {
+  let screenshotIndex = 0;
+  setInterval(async () => {
+    screenshotIndex++;
+    const screenshotPath = path.join(
+      screenshotDir,
+      `screenshot-${screenshotIndex}.png`
+    );
+    try {
+      await page.screenshot({ path: screenshotPath, fullPage: true });
+      console.log(`Screenshot saved: ${screenshotPath}`);
+    } catch (error) {
+      console.error("Error taking screenshot:", error);
+    }
+  }, 1000);
+  // 注册退出时删除文件夹的回调函数
+  process.on("exit", () => {
+    try {
+      fs.rmdirSync(screenshotDir, { recursive: true });
+      console.log(`Deleted folder: ${screenshotDir}`);
+    } catch (error) {
+      console.error(`Error deleting folder ${screenshotDir}:`, error);
+    }
+  });
 }

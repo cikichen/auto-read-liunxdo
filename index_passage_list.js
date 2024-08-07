@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Auto Read
 // @namespace    http://tampermonkey.net/
-// @version      1.3.1
+// @version      1.3.2
 // @description  自动刷linuxdo文章
 // @author       liuweiqing
 // @match        https://meta.discourse.org/*
@@ -299,7 +299,7 @@
         } else {
           console.log("clickCounter:", clickCounter);
         }
-      }, index * 1000); // 这里的1000毫秒是两次点击之间的间隔，可以根据需要调整
+      }, index * 3000); // 这里的3000毫秒是两次点击之间的间隔，可以根据需要调整
     });
   }
   const button = document.createElement("button");
@@ -335,7 +335,7 @@
     } else {
       // 如果是Linuxdo，就导航到我的帖子
       if (BASE_URL == "https://linux.do") {
-        window.location.href = "https://linux.do/t/topic/13716/285";
+        window.location.href = "https://linux.do/t/topic/13716/340";
       } else {
         window.location.href = `${BASE_URL}/t/topic/1`;
       }
